@@ -1,0 +1,20 @@
+Nginx Reverse Proxy & AJP
+
+When we come across an open AJP proxy port (8009 TCP), we can use Nginx with the ajp_module to access the "hidden" Tomcat Manager. 
+
+Pointing to the AJP Port inside the http block in /etc/nginx/conf/nginx.conf
+
+upstream tomcats {
+	server <TARGET_SERVER>:8009;
+	keepalive 10;
+	}
+server {
+	listen 80;
+	location / {
+		ajp_keep_conn on;
+		ajp_pass tomcats;
+	}
+}
+
+sudo nginx
+curl http://127.0.0.1:80

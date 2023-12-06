@@ -1,0 +1,17 @@
+Apache Reverse Proxy & AJP
+Configuring the AJP-Proxy in our Apache server can be done as follows:
+
+
+export TARGET="<TARGET_IP>"
+
+echo -n """<Proxy *>
+Order allow,deny
+Allow from all
+</Proxy>
+ProxyPass / ajp://$TARGET:8009/
+ProxyPassReverse / ajp://$TARGET:8009/""" | sudo tee /etc/apache2/sites-available/ajp-proxy.conf
+
+sudo ln -s /etc/apache2/sites-available/ajp-proxy.conf /etc/apache2/sites-enabled/ajp-proxy.conf
+sudo systemctl start apache2
+
+curl http://127.0.0.1:port
